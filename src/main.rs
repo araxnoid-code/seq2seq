@@ -20,14 +20,18 @@ use burn::{
 #[derive(Module, Debug)]
 struct Model<B: Backend> {
     input: Linear<B>,
-    // hidden: Linear<B>,
-    // softmax: Softmax,
+    hidden_1: Linear<B>,
+    hidden_2: Linear<B>,
     output: Linear<B>,
 }
 
 impl<B: Backend> Model<B> {
     fn forward(&self, input: Tensor<B, 2>) -> Tensor<B, 2> {
         let x = self.input.forward(input);
+        let x = relu(x);
+        let x = self.hidden_1.forward(x);
+        let x = relu(x);
+        let x = self.hidden_2.forward(x);
         let x = relu(x);
         let x = self.output.forward(x);
         let output = softmax(x, 0);
@@ -46,7 +50,8 @@ impl ModelConfig {
     fn init<B: Backend>(&self, device: &B::Device) -> Model<B> {
         Model {
             input: LinearConfig::new(self.input, self.hidden).init(device),
-            // hidden: LinearConfig::new(self.hidden, self.hidden).init(device),
+            hidden_1: LinearConfig::new(self.hidden, self.hidden).init(device),
+            hidden_2: LinearConfig::new(self.hidden, self.hidden).init(device),
             output: LinearConfig::new(self.hidden, self.output).init(device),
         }
     }
@@ -60,13 +65,13 @@ fn main() {
 
 #[derive(Config)]
 struct TrainingConfig {
-    #[config(default = 400)]
+    #[config(default = 1000)]
     num_epoch: usize,
 
     #[config(default = 42)]
     seed: u64,
 
-    #[config(default = 0.01)]
+    #[config(default = 0.0001)]
     lr: f64,
 
     //
@@ -75,7 +80,7 @@ struct TrainingConfig {
 }
 
 pub fn run<B: AutodiffBackend>(device: &B::Device) {
-    let config_model = ModelConfig::new(2, 3, 2);
+    let config_model = ModelConfig::new(2, 32, 3);
     let config_optimazer = AdamConfig::new();
     let config = TrainingConfig::new(config_model, config_optimazer);
     B::seed(config.seed);
@@ -116,7 +121,9 @@ pub fn run<B: AutodiffBackend>(device: &B::Device) {
         let logits = model.forward(input_data.clone());
         let loss = loss_config.forward(logits, label_data.clone());
 
+        // if epoch % 10 == 0 {
         println!("{epoch}: loss => {:?}", loss.clone().into_scalar());
+        // }
 
         let grads = loss.backward();
         let grads = GradientsParams::from_grads(grads, &model);
@@ -127,5 +134,6 @@ pub fn run<B: AutodiffBackend>(device: &B::Device) {
     model.valid();
     let logits = model.forward(input_data);
     println!("{} \n", logits);
+    println!("{} \n", logits.argmax(1));
     println!("{} \n", label_data);
 }
