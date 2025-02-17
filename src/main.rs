@@ -20,7 +20,7 @@ use burn::{
 #[derive(Module, Debug)]
 struct Model<B: Backend> {
     input: Linear<B>,
-    hidden: Linear<B>,
+    // hidden: Linear<B>,
     // softmax: Softmax,
     output: Linear<B>,
 }
@@ -28,8 +28,6 @@ struct Model<B: Backend> {
 impl<B: Backend> Model<B> {
     fn forward(&self, input: Tensor<B, 2>) -> Tensor<B, 2> {
         let x = self.input.forward(input);
-        let x = relu(x);
-        let x = self.hidden.forward(x);
         let x = relu(x);
         let x = self.output.forward(x);
         let output = softmax(x, 0);
@@ -48,7 +46,7 @@ impl ModelConfig {
     fn init<B: Backend>(&self, device: &B::Device) -> Model<B> {
         Model {
             input: LinearConfig::new(self.input, self.hidden).init(device),
-            hidden: LinearConfig::new(self.hidden, self.hidden).init(device),
+            // hidden: LinearConfig::new(self.hidden, self.hidden).init(device),
             output: LinearConfig::new(self.hidden, self.output).init(device),
         }
     }
@@ -68,7 +66,7 @@ struct TrainingConfig {
     #[config(default = 42)]
     seed: u64,
 
-    #[config(default = 0.001)]
+    #[config(default = 0.01)]
     lr: f64,
 
     //
@@ -77,42 +75,46 @@ struct TrainingConfig {
 }
 
 pub fn run<B: AutodiffBackend>(device: &B::Device) {
-    let config_model = ModelConfig::new(1, 256, 2);
+    let config_model = ModelConfig::new(2, 3, 2);
     let config_optimazer = AdamConfig::new();
     let config = TrainingConfig::new(config_model, config_optimazer);
     B::seed(config.seed);
 
     let mut model = config.model.init::<B>(&device);
     let mut optim = config.optimazer.init();
-
-    let raw = [
-        1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0,
-    ];
-    let mut predicted_raw: Vec<Tensor<B, 1, Int>> = Vec::new();
-
-    for value in raw {
-        if value % 2.0 == 0.0 {
-            predicted_raw.push(Tensor::from([1]));
-        } else {
-            predicted_raw.push(Tensor::from([0]));
-        }
-    }
-    let input_raw = raw
-        .into_iter()
-        .map(|v| Tensor::from([[v]]))
-        .collect::<Vec<Tensor<B, 2>>>();
     let loss_config = CrossEntropyLossConfig::new().init::<B>(&device);
-    let input = Tensor::cat(input_raw, 0);
-    let predicted = Tensor::cat(predicted_raw, 0);
 
-    // let logit = model.forward(input);
-    // let loss = loss_config.forward(logit, predicted);
+    let data = vec![
+        // sepal petal label
+        (3.5, 0.2, 0.0),
+        (3.0, 0.2, 0.0),
+        (3.2, 0.2, 0.0),
+        (3.1, 0.2, 0.0),
+        (3.6, 0.3, 0.0),
+        (3.2, 1.4, 1.0),
+        (3.2, 1.5, 1.0),
+        (3.1, 1.5, 1.0),
+        (2.3, 1.3, 1.0),
+        (2.8, 1.5, 1.0),
+        (3.3, 2.5, 2.0),
+        (2.7, 1.9, 2.0),
+        (3.0, 2.1, 2.0),
+        (2.9, 1.8, 2.0),
+        (3.0, 2.2, 2.0),
+    ];
+
+    let mut input_data: Vec<Tensor<B, 2>> = vec![];
+    let mut label_data: Vec<Tensor<B, 1, Int>> = vec![];
+    for (sepal, petal, label) in data {
+        input_data.push(Tensor::from([[sepal, petal]]));
+        label_data.push(Tensor::from([label as i32]));
+    }
+    let input_data = Tensor::cat(input_data, 0);
+    let label_data = Tensor::cat(label_data, 0);
 
     for epoch in 0..config.num_epoch {
-        let logits = model.forward(input.clone());
-        // let loss = MseLoss::new().forward(pred.clone(), observed.clone(), Reduction::Auto);
-
-        let loss = loss_config.forward(logits, predicted.clone());
+        let logits = model.forward(input_data.clone());
+        let loss = loss_config.forward(logits, label_data.clone());
 
         println!("{epoch}: loss => {:?}", loss.clone().into_scalar());
 
@@ -123,7 +125,7 @@ pub fn run<B: AutodiffBackend>(device: &B::Device) {
     }
 
     model.valid();
-    let logits = model.forward(input);
+    let logits = model.forward(input_data);
     println!("{} \n", logits);
-    println!("{} \n", predicted);
+    println!("{} \n", label_data);
 }
