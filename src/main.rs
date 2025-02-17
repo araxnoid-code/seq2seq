@@ -1,8 +1,10 @@
 use burn::backend::wgpu::WgpuDevice;
 use burn::backend::{Autodiff, Wgpu};
 use burn::module::AutodiffModule;
-use burn::tensor::activation::{sigmoid, softplus};
-use burn::tensor::loss;
+use burn::nn::loss::{CrossEntropyLoss, CrossEntropyLossConfig};
+use burn::nn::Relu;
+use burn::tensor::activation::{relu, sigmoid, softmax, softplus};
+use burn::tensor::{loss, Int, TensorData};
 use burn::{
     config::Config,
     module::Module,
@@ -19,15 +21,19 @@ use burn::{
 struct Model<B: Backend> {
     input: Linear<B>,
     hidden: Linear<B>,
+    // softmax: Softmax,
     output: Linear<B>,
 }
 
 impl<B: Backend> Model<B> {
     fn forward(&self, input: Tensor<B, 2>) -> Tensor<B, 2> {
         let x = self.input.forward(input);
-        let x = softplus(x, 1.0);
+        let x = relu(x);
+        let x = self.hidden.forward(x);
+        let x = relu(x);
         let x = self.output.forward(x);
-        x
+        let output = softmax(x, 0);
+        output
     }
 }
 
@@ -62,7 +68,7 @@ struct TrainingConfig {
     #[config(default = 42)]
     seed: u64,
 
-    #[config(default = 0.1)]
+    #[config(default = 0.001)]
     lr: f64,
 
     //
@@ -71,7 +77,7 @@ struct TrainingConfig {
 }
 
 pub fn run<B: AutodiffBackend>(device: &B::Device) {
-    let config_model = ModelConfig::new(1, 2, 1);
+    let config_model = ModelConfig::new(1, 256, 2);
     let config_optimazer = AdamConfig::new();
     let config = TrainingConfig::new(config_model, config_optimazer);
     B::seed(config.seed);
@@ -79,16 +85,34 @@ pub fn run<B: AutodiffBackend>(device: &B::Device) {
     let mut model = config.model.init::<B>(&device);
     let mut optim = config.optimazer.init();
 
-    let input: Tensor<B, 2> = Tensor::from([[0.0], [0.5], [1.0]]);
-    let observed: Tensor<B, 2> = Tensor::from([[0.0], [1.0], [0.0]]);
+    let raw = [
+        1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0,
+    ];
+    let mut predicted_raw: Vec<Tensor<B, 1, Int>> = Vec::new();
+
+    for value in raw {
+        if value % 2.0 == 0.0 {
+            predicted_raw.push(Tensor::from([1]));
+        } else {
+            predicted_raw.push(Tensor::from([0]));
+        }
+    }
+    let input_raw = raw
+        .into_iter()
+        .map(|v| Tensor::from([[v]]))
+        .collect::<Vec<Tensor<B, 2>>>();
+    let loss_config = CrossEntropyLossConfig::new().init::<B>(&device);
+    let input = Tensor::cat(input_raw, 0);
+    let predicted = Tensor::cat(predicted_raw, 0);
+
+    // let logit = model.forward(input);
+    // let loss = loss_config.forward(logit, predicted);
 
     for epoch in 0..config.num_epoch {
-        let pred = model.forward(input.clone());
+        let logits = model.forward(input.clone());
         // let loss = MseLoss::new().forward(pred.clone(), observed.clone(), Reduction::Auto);
 
-        let loss_2 = observed.clone() - pred.clone();
-        let loss_2 = loss_2.clone() * loss_2;
-        let loss = loss_2.sum();
+        let loss = loss_config.forward(logits, predicted.clone());
 
         println!("{epoch}: loss => {:?}", loss.clone().into_scalar());
 
@@ -99,6 +123,7 @@ pub fn run<B: AutodiffBackend>(device: &B::Device) {
     }
 
     model.valid();
-    let prediction = model.forward(input);
-    println!("{}", prediction);
+    let logits = model.forward(input);
+    println!("{} \n", logits);
+    println!("{} \n", predicted);
 }
