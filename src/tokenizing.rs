@@ -3,7 +3,7 @@ use std::collections::HashMap;
 pub struct Tokenizing {
     pub word_to_index: HashMap<String, i32>,
     pub index_to_word: HashMap<i32, String>,
-    count: i32,
+    pub count: i32,
 }
 
 impl Default for Tokenizing {

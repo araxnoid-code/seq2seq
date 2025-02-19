@@ -2,7 +2,7 @@ mod model;
 mod tokenizing;
 use burn::{
     backend::{wgpu::WgpuDevice, Autodiff, Wgpu},
-    tensor::Tensor,
+    tensor::{Int, Tensor},
 };
 use model::*;
 use std::{collections::HashMap, fs::File, io::Read};
@@ -55,11 +55,11 @@ fn main() {
     // tensoring data
     let mut input_tensor = Vec::new();
     for input in input_tokens {
-        let mut list = [1.0; 20];
+        let mut list = [1; 20];
         for (idx, word) in input.iter().enumerate() {
-            list[idx] = word.clone();
+            list[idx] = word.clone() as i32;
         }
-        let tensor: Tensor<MyBackend, 2> = Tensor::from([list]);
+        let tensor: Tensor<MyBackend, 2, Int> = Tensor::from([list]);
         input_tensor.push(tensor);
     }
     let input_tensor = Tensor::cat(input_tensor, 0);
@@ -74,4 +74,10 @@ fn main() {
         output_tensor.push(tensor);
     }
     let output_tensor = Tensor::cat(output_tensor, 0);
+
+    let encoder_cfg = EncoderConfig::new(token.count as usize, 64);
+    let encoder_model = encoder_cfg.init::<MyBackend>(&device);
+
+    let (context_vector, state) = encoder_model.forward(input_tensor);
+    println!("{context_vector}")
 }
