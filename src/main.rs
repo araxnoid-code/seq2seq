@@ -79,20 +79,14 @@ fn main() {
     let output_tensor_copy = output_tensor.clone();
     let output_tensor = Tensor::cat(output_tensor, 0);
 
-    let encoder_cfg = EncoderConfig::new(token.count as usize, 64);
-    let decoder_cfg = DecoderConfig::new(64, token.count as usize);
-    let encoder_model = encoder_cfg.init::<MyBackend>(&device);
-    let decoder_model = decoder_cfg.init::<MyBackend>(&device);
+    let seq2seq_cfg = Seq2SeqConfig::new(token.count as usize, 64, token.count as usize);
+    let seq2seq_model = seq2seq_cfg.init::<MyBackend>(&device);
     let loss_fn = CrossEntropyLossConfig::new().init::<MyBackend>(&device);
 
     for (idx, input) in input_tensor_copy.iter().enumerate() {
-        let context_vector = encoder_model.forward(input.clone());
-        let state = context_vector.unwrap();
-        let pred = decoder_model.forward(
-            input.clone(),
-            state,
-            Some(output_tensor_copy.get(idx).unwrap().clone()),
-        );
+        let target = output_tensor_copy.get(idx).unwrap().clone();
+        let pred = seq2seq_model.forward(input.clone(), Some(target));
+
         let target = Tensor::cat(
             vec![
                 output_tensor_copy.get(idx).unwrap().clone(),
@@ -102,7 +96,7 @@ fn main() {
         );
         let target: Tensor<MyBackend, 1, Int> = target.reshape([-1]);
         let loss = loss_fn.forward(pred, target);
-        println!("finish");
+        println!("{loss}");
 
         break;
     }
