@@ -67,23 +67,39 @@ fn main() {
 
     let mut output_tensor = Vec::new();
     for output in output_tokens {
-        let mut list = [1.0; 20];
+        let mut list = [1; 20];
         for (idx, word) in output.iter().enumerate() {
-            list[idx] = word.clone();
+            list[idx] = word.clone() as i32;
         }
-        let tensor: Tensor<MyBackend, 2> = Tensor::from([list]);
+        let tensor: Tensor<MyBackend, 2, Int> = Tensor::from([list]);
         output_tensor.push(tensor);
     }
+    let output_tensor_copy = output_tensor.clone();
     let output_tensor = Tensor::cat(output_tensor, 0);
 
     let encoder_cfg = EncoderConfig::new(token.count as usize, 64);
-    // let decoder_cfg = DecoderConfig::new(64, token.count as usize);
+    let decoder_cfg = DecoderConfig::new(64, token.count as usize);
     let encoder_model = encoder_cfg.init::<MyBackend>(&device);
-    // let decoder_model = decoder_cfg.init::<MyBackend>(&device);
+    let decoder_model = decoder_cfg.init::<MyBackend>(&device);
 
-    for input in input_tensor_copy {
-        let context_vector = encoder_model.forward(input);
+    for (idx, input) in input_tensor_copy.iter().enumerate() {
+        let context_vector = encoder_model.forward(input.clone());
         let state = context_vector.unwrap();
+        let pred = decoder_model.forward(
+            input.clone(),
+            state,
+            Some(output_tensor_copy.get(idx).unwrap().clone()),
+        );
+        let pred_max = pred.argmax(1);
+        let pred_vector: Vec<i32> = pred_max.to_data().to_vec().unwrap();
+        for value in pred_vector {
+            let word = token.index_to_word.get(&value).unwrap();
+            println!("{word}");
+        }
+
         break;
     }
+
+    // let a: Tensor<MyBackend, 2> = Tensor::from([1]);
+    // a.reshape
 }

@@ -26,7 +26,6 @@ impl<B: Backend> Encoder<B> {
                 state_save = Some(state);
             }
         }
-
         state_save
     }
 }
