@@ -2,8 +2,8 @@ mod model;
 mod tokenizing;
 use burn::{
     backend::{wgpu::WgpuDevice, Autodiff, Wgpu},
-    nn::loss::CrossEntropyLossConfig,
-    optim::GradientsParams,
+    nn::loss::{CrossEntropyLoss, CrossEntropyLossConfig},
+    optim::{Adam, AdamConfig, GradientsParams, Optimizer},
     tensor::{Int, Tensor},
 };
 use model::*;
@@ -79,26 +79,36 @@ fn main() {
     let output_tensor_copy = output_tensor.clone();
     let output_tensor = Tensor::cat(output_tensor, 0);
 
-    let seq2seq_cfg = Seq2SeqConfig::new(token.count as usize, 64, token.count as usize);
-    let seq2seq_model = seq2seq_cfg.init::<MyBackend>(&device);
+    let seq2seq_cfg = Seq2SeqConfig::new(token.count as usize, 124, token.count as usize);
+    let mut seq2seq_model = seq2seq_cfg.init::<MyBackend>(&device);
+    let mut optim = AdamConfig::new().init();
     let loss_fn = CrossEntropyLossConfig::new().init::<MyBackend>(&device);
 
-    for (idx, input) in input_tensor_copy.iter().enumerate() {
-        let target = output_tensor_copy.get(idx).unwrap().clone();
-        let pred = seq2seq_model.forward(input.clone(), Some(target));
+    let epoch = 10;
 
-        let target = Tensor::cat(
-            vec![
-                output_tensor_copy.get(idx).unwrap().clone(),
-                Tensor::from([[1]]),
-            ],
-            1,
-        );
-        let target: Tensor<MyBackend, 1, Int> = target.reshape([-1]);
-        let loss = loss_fn.forward(pred, target);
-        println!("{loss}");
+    for i in 0..epoch {
+        for (idx, input) in input_tensor_copy.iter().enumerate() {
+            let target = output_tensor_copy.get(idx).unwrap().clone();
 
-        break;
+            let pred = seq2seq_model.forward(input.clone(), Some(target.clone()));
+
+            let target: Tensor<MyBackend, 1, Int> = target.clone().reshape([-1]);
+            let target = Tensor::cat(vec![target, Tensor::from([0])], 0);
+            let loss = loss_fn.forward(pred, target);
+            println!("{i},{idx} | loss => {loss}");
+
+            let grads = loss.backward();
+            let grads = GradientsParams::from_grads(grads, &seq2seq_model);
+
+            seq2seq_model = optim.step(0.0001, seq2seq_model, grads);
+
+            // let pred_max = pred.argmax(1);
+            // let pred_vector: Vec<i32> = pred_max.to_data().to_vec().unwrap();
+            // for value in pred_vector{
+
+            // token.index_to_word.get().unwrap()
+            // }
+        }
     }
 
     // let a: Tensor<MyBackend, 2> = Tensor::from([1]);
