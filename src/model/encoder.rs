@@ -1,7 +1,7 @@
 use burn::{
     config::Config,
     module::Module,
-    nn::{Embedding, EmbeddingConfig, Lstm, LstmConfig},
+    nn::{Embedding, EmbeddingConfig, Lstm, LstmConfig, LstmState},
     prelude::Backend,
     tensor::{Int, Tensor},
 };
@@ -13,10 +13,21 @@ pub struct Encoder<B: Backend> {
 }
 
 impl<B: Backend> Encoder<B> {
-    pub fn forward(&self, input: Tensor<B, 2, Int>) -> (Tensor<B, 3>, burn::nn::LstmState<B, 2>) {
+    pub fn forward(&self, input: Tensor<B, 2, Int>) -> Option<LstmState<B, 2>> {
         let embedded = self.embedding.forward(input);
-        let (context_vector, state) = self.lstm.forward(embedded, None);
-        (context_vector, state)
+        let mut state_save: Option<LstmState<B, 2>> = None;
+        for i in 0..20 {
+            let embedded_slice = embedded.clone().slice([0..1, i..i + 1]);
+            if let Some(state) = state_save {
+                let (_, state) = self.lstm.forward(embedded_slice, Some(state));
+                state_save = Some(state);
+            } else {
+                let (_, state) = self.lstm.forward(embedded_slice, None);
+                state_save = Some(state);
+            }
+        }
+
+        state_save
     }
 }
 
