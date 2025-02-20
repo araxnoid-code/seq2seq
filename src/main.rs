@@ -62,6 +62,7 @@ fn main() {
         let tensor: Tensor<MyBackend, 2, Int> = Tensor::from([list]);
         input_tensor.push(tensor);
     }
+    let input_tensor_copy = input_tensor.clone();
     let input_tensor = Tensor::cat(input_tensor, 0);
 
     let mut output_tensor = Vec::new();
@@ -76,8 +77,16 @@ fn main() {
     let output_tensor = Tensor::cat(output_tensor, 0);
 
     let encoder_cfg = EncoderConfig::new(token.count as usize, 64);
+    let decoder_cfg = DecoderConfig::new(64, token.count as usize);
     let encoder_model = encoder_cfg.init::<MyBackend>(&device);
+    let decoder_model = decoder_cfg.init::<MyBackend>(&device);
 
-    let (context_vector, state) = encoder_model.forward(input_tensor);
-    println!("{context_vector}")
+    // println!("{output_tensor}");
+    println!("======================");
+    let (_, context_vector) = encoder_model.forward(input_tensor);
+    let test = input_tensor_copy.get(0).unwrap().clone();
+    // println!("{test}");
+    println!("======================");
+    decoder_model.forward(test, context_vector);
+    // println!("{output}")
 }
