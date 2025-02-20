@@ -2,6 +2,8 @@ mod model;
 mod tokenizing;
 use burn::{
     backend::{wgpu::WgpuDevice, Autodiff, Wgpu},
+    nn::loss::CrossEntropyLossConfig,
+    optim::GradientsParams,
     tensor::{Int, Tensor},
 };
 use model::*;
@@ -81,6 +83,7 @@ fn main() {
     let decoder_cfg = DecoderConfig::new(64, token.count as usize);
     let encoder_model = encoder_cfg.init::<MyBackend>(&device);
     let decoder_model = decoder_cfg.init::<MyBackend>(&device);
+    let loss_fn = CrossEntropyLossConfig::new().init::<MyBackend>(&device);
 
     for (idx, input) in input_tensor_copy.iter().enumerate() {
         let context_vector = encoder_model.forward(input.clone());
@@ -90,12 +93,16 @@ fn main() {
             state,
             Some(output_tensor_copy.get(idx).unwrap().clone()),
         );
-        let pred_max = pred.argmax(1);
-        let pred_vector: Vec<i32> = pred_max.to_data().to_vec().unwrap();
-        for value in pred_vector {
-            let word = token.index_to_word.get(&value).unwrap();
-            println!("{word}");
-        }
+        let target = Tensor::cat(
+            vec![
+                output_tensor_copy.get(idx).unwrap().clone(),
+                Tensor::from([[1]]),
+            ],
+            1,
+        );
+        let target: Tensor<MyBackend, 1, Int> = target.reshape([-1]);
+        let loss = loss_fn.forward(pred, target);
+        println!("finish");
 
         break;
     }
