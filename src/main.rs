@@ -3,12 +3,12 @@ mod tokenizing;
 use burn::{
     backend::{wgpu::WgpuDevice, Autodiff, Wgpu},
     module::AutodiffModule,
-    nn::loss::{CrossEntropyLoss, CrossEntropyLossConfig},
-    optim::{Adam, AdamConfig, GradientsParams, Optimizer},
+    nn::loss::CrossEntropyLossConfig,
+    optim::{AdamConfig, GradientsParams, Optimizer},
     tensor::{Int, Tensor},
 };
 use model::*;
-use std::{collections::HashMap, fs::File, io::Read};
+use std::{fs::File, io::Read};
 use tokenizing::*;
 
 fn main() {
@@ -66,7 +66,7 @@ fn main() {
         input_tensor.push(tensor);
     }
     let input_tensor_copy = input_tensor.clone();
-    let input_tensor = Tensor::cat(input_tensor, 0);
+    let _input_tensor = Tensor::cat(input_tensor, 0);
 
     let mut output_tensor = Vec::new();
     for output in output_tokens {
@@ -78,7 +78,7 @@ fn main() {
         output_tensor.push(tensor);
     }
     let output_tensor_copy = output_tensor.clone();
-    let output_tensor = Tensor::cat(output_tensor, 0);
+    let _output_tensor = Tensor::cat(output_tensor, 0);
 
     let seq2seq_cfg = Seq2SeqConfig::new(token.count as usize, 124, token.count as usize);
     let mut seq2seq_model = seq2seq_cfg.init::<MyBackend>(&device);

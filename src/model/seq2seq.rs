@@ -3,10 +3,7 @@ use burn::{
     module::Module,
     nn::{Embedding, EmbeddingConfig, Linear, LinearConfig, Lstm, LstmConfig, LstmState},
     prelude::Backend,
-    tensor::{
-        activation::{sigmoid, softmax},
-        Int, Tensor,
-    },
+    tensor::{activation::softmax, Int, Tensor},
 };
 
 #[derive(Debug, Module)]
@@ -39,7 +36,7 @@ impl<B: Backend> Seq2Seq<B> {
 
     pub fn decoder_forward(
         &self,
-        input: Tensor<B, 2, Int>,
+        _input: Tensor<B, 2, Int>,
         state: LstmState<B, 2>,
         teaching: Option<Tensor<B, 2, Int>>,
     ) -> Tensor<B, 2> {
