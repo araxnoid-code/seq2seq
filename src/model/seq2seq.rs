@@ -3,7 +3,10 @@ use burn::{
     module::Module,
     nn::{Embedding, EmbeddingConfig, Linear, LinearConfig, Lstm, LstmConfig, LstmState},
     prelude::Backend,
-    tensor::{activation::softmax, Int, Tensor},
+    tensor::{
+        activation::{relu, softmax},
+        Int, Tensor,
+    },
 };
 
 #[derive(Debug, Module)]
@@ -15,6 +18,7 @@ pub struct Seq2Seq<B: Backend> {
     decoder_embedding: Embedding<B>,
     decoder_lstm: Lstm<B>,
     decoder_linear: Linear<B>,
+    decoder_linear_2: Linear<B>,
 }
 
 impl<B: Backend> Seq2Seq<B> {
@@ -50,6 +54,9 @@ impl<B: Backend> Seq2Seq<B> {
                 let embedded_slice = embedded.clone().slice([0..1, i..i + 1]);
                 let (output, state) = self.decoder_lstm.forward(embedded_slice, Some(state_model));
                 let output = self.decoder_linear.forward(output);
+                // let output = relu(output);
+                let output = self.decoder_linear_2.forward(output);
+                // let output = relu(output);
                 let output = output.reshape([0, -1]);
                 let output = softmax(output, 1);
                 outputs.push(output);
@@ -61,7 +68,11 @@ impl<B: Backend> Seq2Seq<B> {
             for _ in 0..21 {
                 let embedded = self.decoder_embedding.forward(input.clone());
                 let (pred, state) = self.decoder_lstm.forward(embedded, Some(state_model));
-                let output = self.decoder_linear.forward(pred).reshape([0, -1]);
+                let output = self.decoder_linear.forward(pred);
+                // let output = relu(output);
+                let output = self.decoder_linear_2.forward(output);
+                // let output = relu(output);
+                let output = output.reshape([0, -1]);
                 let output = softmax(output, 1);
                 outputs.push(output.clone());
 
@@ -103,7 +114,8 @@ impl Seq2SeqConfig {
             // decode.init
             decoder_embedding: EmbeddingConfig::new(self.output, self.hidden).init(device),
             decoder_lstm: LstmConfig::new(self.hidden, self.hidden, true).init(device),
-            decoder_linear: LinearConfig::new(self.hidden, self.output).init(device),
+            decoder_linear: LinearConfig::new(self.hidden, self.hidden).init(device),
+            decoder_linear_2: LinearConfig::new(self.hidden, self.output).init(device),
         }
     }
 }
