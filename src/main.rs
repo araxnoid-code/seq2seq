@@ -2,6 +2,7 @@ mod model;
 mod tokenizing;
 use burn::{
     backend::{wgpu::WgpuDevice, Autodiff, Wgpu},
+    module::AutodiffModule,
     nn::loss::{CrossEntropyLoss, CrossEntropyLossConfig},
     optim::{Adam, AdamConfig, GradientsParams, Optimizer},
     tensor::{Int, Tensor},
@@ -101,16 +102,16 @@ fn main() {
             let grads = GradientsParams::from_grads(grads, &seq2seq_model);
 
             seq2seq_model = optim.step(0.0001, seq2seq_model, grads);
-
-            // let pred_max = pred.argmax(1);
-            // let pred_vector: Vec<i32> = pred_max.to_data().to_vec().unwrap();
-            // for value in pred_vector{
-
-            // token.index_to_word.get().unwrap()
-            // }
         }
     }
 
-    // let a: Tensor<MyBackend, 2> = Tensor::from([1]);
-    // a.reshape
+    seq2seq_model.valid();
+    let test_input = input_tensor_copy.get(0).unwrap().clone();
+    let pred = seq2seq_model.forward(test_input, None);
+    let max_pred = pred.argmax(1);
+    let vector_pred: Vec<i32> = max_pred.to_data().to_vec().unwrap();
+    for pred in &vector_pred {
+        let word = token.index_to_word.get(pred).unwrap();
+        println!("{word}");
+    }
 }

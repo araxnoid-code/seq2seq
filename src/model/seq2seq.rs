@@ -3,7 +3,10 @@ use burn::{
     module::Module,
     nn::{Embedding, EmbeddingConfig, Linear, LinearConfig, Lstm, LstmConfig, LstmState},
     prelude::Backend,
-    tensor::{activation::softmax, Int, Tensor},
+    tensor::{
+        activation::{sigmoid, softmax},
+        Int, Tensor,
+    },
 };
 
 #[derive(Debug, Module)]
@@ -54,6 +57,21 @@ impl<B: Backend> Seq2Seq<B> {
                 let output = softmax(output, 1);
                 outputs.push(output);
                 state_model = state;
+            }
+        } else {
+            let mut input: Tensor<B, 2, Int> = Tensor::from([[0]]);
+            let mut state_model = state;
+            for _ in 0..21 {
+                let embedded = self.decoder_embedding.forward(input.clone());
+                let (pred, state) = self.decoder_lstm.forward(embedded, Some(state_model));
+                let output = self.decoder_linear.forward(pred).reshape([0, -1]);
+                let output = softmax(output, 1);
+                outputs.push(output.clone());
+
+                // update input
+                let next_input = output.argmax(1);
+                input = next_input;
+                state_model = state
             }
         }
 
