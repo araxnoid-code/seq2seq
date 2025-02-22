@@ -85,7 +85,7 @@ fn main() {
     let mut optim = AdamConfig::new().init();
     let loss_fn = CrossEntropyLossConfig::new().init::<MyBackend>(&device);
 
-    let epoch = 10;
+    let epoch = 100;
 
     for i in 0..epoch {
         let mut losses = vec![];
@@ -99,23 +99,28 @@ fn main() {
             let loss = loss_fn.forward(pred, target);
             losses.push(loss);
 
-            // println!("{i},{idx} | loss => {loss}");
-
-            // let grads = loss.backward();
-            // let grads = GradientsParams::from_grads(grads, &seq2seq_model);
-
-            // seq2seq_model = optim.step(0.0001, seq2seq_model, grads);
+            println!("{idx}/{}", input_tensor_copy.len());
         }
         let losses = Tensor::cat(losses, 0);
         let losses_sum = losses.sum();
-        let loss_scalar = losses_sum.clone().into_scalar() / input_tensor_copy.len() as f32;
-        let loss: Tensor<MyBackend, 1> = Tensor::from([loss_scalar]);
+        let loss = losses_sum / input_tensor_copy.len() as f32;
+        let loss_scalar = loss.clone().into_scalar();
         println!("{i} | loss {loss_scalar}");
 
         let grads = loss.backward();
         let grads = GradientsParams::from_grads(grads, &seq2seq_model);
 
         seq2seq_model = optim.step(0.0001, seq2seq_model, grads);
+
+        // test
+        let test_input = input_tensor_copy.get(0).unwrap().clone();
+        let pred = seq2seq_model.forward(test_input, None);
+        let max_pred = pred.argmax(1);
+        let vector_pred: Vec<i32> = max_pred.to_data().to_vec().unwrap();
+        for pred in &vector_pred {
+            let word = token.index_to_word.get(pred).unwrap();
+            println!("{word}");
+        }
     }
 
     seq2seq_model.valid();
