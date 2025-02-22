@@ -80,7 +80,7 @@ fn main() {
     let output_tensor_copy = output_tensor.clone();
     let _output_tensor = Tensor::cat(output_tensor, 0);
 
-    let seq2seq_cfg = Seq2SeqConfig::new(token.count as usize, 124, token.count as usize);
+    let seq2seq_cfg = Seq2SeqConfig::new(token.count as usize, 64, token.count as usize);
     let mut seq2seq_model = seq2seq_cfg.init::<MyBackend>(&device);
     let mut optim = AdamConfig::new().init();
     let loss_fn = CrossEntropyLossConfig::new().init::<MyBackend>(&device);
@@ -93,7 +93,7 @@ fn main() {
             let target = output_tensor_copy.get(idx).unwrap().clone();
 
             let pred = seq2seq_model.forward(input.clone(), Some(target.clone()));
-            break;
+            // break;
 
             let target: Tensor<MyBackend, 1, Int> = target.clone().reshape([-1]);
             let target = Tensor::cat(vec![target, Tensor::from([0])], 0);
@@ -102,7 +102,7 @@ fn main() {
 
             println!("{idx}/{}", input_tensor_copy.len());
         }
-        break;
+        // break;
         let losses = Tensor::cat(losses, 0);
         let losses_sum = losses.sum();
         let loss = losses_sum / input_tensor_copy.len() as f32;
@@ -113,6 +113,15 @@ fn main() {
         let grads = GradientsParams::from_grads(grads, &seq2seq_model);
 
         seq2seq_model = optim.step(0.0001, seq2seq_model, grads);
+
+        let test_input = input_tensor_copy.get(0).unwrap().clone();
+        let pred = seq2seq_model.forward(test_input, None);
+        let max_pred = pred.argmax(1);
+        let vector_pred: Vec<i32> = max_pred.to_data().to_vec().unwrap();
+        for pred in &vector_pred {
+            let word = token.index_to_word.get(pred).unwrap();
+            println!("{word}");
+        }
     }
 
     seq2seq_model.valid();
@@ -124,4 +133,9 @@ fn main() {
         let word = token.index_to_word.get(pred).unwrap();
         println!("{word}");
     }
+
+    // let a: Tensor<MyBackend, 2> =
+    //     Tensor::from([[1.0, 2.0, 3.0, 4.0, 5.0], [1.0, 2.0, 3.0, 4.0, 5.0]]);
+    // let a = a.sum_dim(0);
+    // println!("{a}");
 }

@@ -64,12 +64,8 @@ impl<B: Backend> Seq2Seq<B> {
             for i in 0..21 {
                 let embedded_slice = embedded.clone().slice([0..1, i..i + 1]);
                 let (output, state) = self.decoder_lstm.forward(embedded_slice, Some(state_model));
-                // let output = self.decoder_linear.forward(output);
-                // let output = relu(output);
-                self.attention(output.clone(), hiddens.clone());
+                let output = self.attention(output.clone(), hiddens.clone());
                 let output = self.decoder_linear_2.forward(output);
-                // let output = relu(output);
-                let output = output.reshape([0, -1]);
                 let output = softmax(output, 1);
                 outputs.push(output);
                 state_model = state;
@@ -80,11 +76,8 @@ impl<B: Backend> Seq2Seq<B> {
             for _ in 0..21 {
                 let embedded = self.decoder_embedding.forward(input.clone());
                 let (output, state) = self.decoder_lstm.forward(embedded, Some(state_model));
-                // let output = self.decoder_linear.forward(pred);
-                // let output = relu(output);
+                let output = self.attention(output.clone(), hiddens.clone());
                 let output = self.decoder_linear_2.forward(output);
-                // let output = relu(output);
-                let output = output.reshape([0, -1]);
                 let output = softmax(output, 1);
                 outputs.push(output.clone());
 
@@ -98,15 +91,21 @@ impl<B: Backend> Seq2Seq<B> {
         Tensor::cat(outputs, 0)
     }
 
-    pub fn attention(&self, tensor: Tensor<B, 3>, hiddens: Vec<Tensor<B, 2>>) {
-        let tensor = tensor.reshape([0, -1]);
+    pub fn attention(&self, tensor: Tensor<B, 3>, hiddens: Vec<Tensor<B, 2>>) -> Tensor<B, 2> {
+        let tensor = tensor.clone().reshape([0, -1]);
         let mut matmuls = vec![];
-        for hidden in hiddens {
+        for hidden in hiddens.clone() {
             let hidden = hidden.permute([1, 0]);
             let matmul = tensor.clone().matmul(hidden);
             matmuls.push(matmul);
         }
-        // matmuls.
+        let hiddens = Tensor::cat(hiddens, 0);
+        let matmuls = Tensor::cat(matmuls, 1);
+        let matmuls = softmax(matmuls, 1);
+
+        let matmuls = matmuls.matmul(hiddens);
+        let tensor = Tensor::cat(vec![tensor, matmuls], 1);
+        tensor
     }
 
     pub fn forward(
@@ -138,8 +137,10 @@ impl Seq2SeqConfig {
             // decode.init
             decoder_embedding: EmbeddingConfig::new(self.output, self.hidden).init(device),
             decoder_lstm: LstmConfig::new(self.hidden, self.hidden, true).init(device),
-            decoder_linear: LinearConfig::new(self.hidden, self.hidden).init(device),
-            decoder_linear_2: LinearConfig::new(self.hidden, self.output).init(device),
+            decoder_linear: LinearConfig::new(self.hidden + self.hidden, self.hidden + self.hidden)
+                .init(device),
+            decoder_linear_2: LinearConfig::new(self.hidden + self.hidden, self.output)
+                .init(device),
         }
     }
 }
