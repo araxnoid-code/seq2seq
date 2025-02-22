@@ -22,25 +22,36 @@ pub struct Seq2Seq<B: Backend> {
 }
 
 impl<B: Backend> Seq2Seq<B> {
-    pub fn encoder_forward(&self, input: Tensor<B, 2, Int>) -> Option<LstmState<B, 2>> {
+    pub fn encoder_forward(
+        &self,
+        input: Tensor<B, 2, Int>,
+    ) -> (Option<LstmState<B, 2>>, Vec<Tensor<B, 2>>) {
         let embedded = self.encoder_embedding.forward(input);
         let mut state_save: Option<LstmState<B, 2>> = None;
+        let mut hiddens = vec![];
         for i in 0..20 {
             let embedded_slice = embedded.clone().slice([0..1, i..i + 1]);
             if let Some(state) = state_save {
                 let (_, state) = self.encoder_lstm.forward(embedded_slice, Some(state));
+                // save for attention
+                hiddens.push(state.hidden.clone());
+                //
                 state_save = Some(state);
             } else {
                 let (_, state) = self.encoder_lstm.forward(embedded_slice, None);
+                // save for attention
+                hiddens.push(state.hidden.clone());
+                //
                 state_save = Some(state);
             }
         }
-        state_save
+
+        (state_save, hiddens)
     }
 
     pub fn decoder_forward(
         &self,
-        _input: Tensor<B, 2, Int>,
+        hiddens: Vec<Tensor<B, 2>>,
         state: LstmState<B, 2>,
         teaching: Option<Tensor<B, 2, Int>>,
     ) -> Tensor<B, 2> {
@@ -53,8 +64,9 @@ impl<B: Backend> Seq2Seq<B> {
             for i in 0..21 {
                 let embedded_slice = embedded.clone().slice([0..1, i..i + 1]);
                 let (output, state) = self.decoder_lstm.forward(embedded_slice, Some(state_model));
-                let output = self.decoder_linear.forward(output);
+                // let output = self.decoder_linear.forward(output);
                 // let output = relu(output);
+                self.attention(output.clone(), hiddens.clone());
                 let output = self.decoder_linear_2.forward(output);
                 // let output = relu(output);
                 let output = output.reshape([0, -1]);
@@ -67,8 +79,8 @@ impl<B: Backend> Seq2Seq<B> {
             let mut state_model = state;
             for _ in 0..21 {
                 let embedded = self.decoder_embedding.forward(input.clone());
-                let (pred, state) = self.decoder_lstm.forward(embedded, Some(state_model));
-                let output = self.decoder_linear.forward(pred);
+                let (output, state) = self.decoder_lstm.forward(embedded, Some(state_model));
+                // let output = self.decoder_linear.forward(pred);
                 // let output = relu(output);
                 let output = self.decoder_linear_2.forward(output);
                 // let output = relu(output);
@@ -86,14 +98,26 @@ impl<B: Backend> Seq2Seq<B> {
         Tensor::cat(outputs, 0)
     }
 
+    pub fn attention(&self, tensor: Tensor<B, 3>, hiddens: Vec<Tensor<B, 2>>) {
+        let tensor = tensor.reshape([0, -1]);
+        let mut matmuls = vec![];
+        for hidden in hiddens {
+            let hidden = hidden.permute([1, 0]);
+            let matmul = tensor.clone().matmul(hidden);
+            matmuls.push(matmul);
+        }
+        // matmuls.
+    }
+
     pub fn forward(
         &self,
         input: Tensor<B, 2, Int>,
         teaching: Option<Tensor<B, 2, Int>>,
     ) -> Tensor<B, 2> {
-        let context_vector = self.encoder_forward(input.clone());
+        let (context_vector, hiddens) = self.encoder_forward(input.clone());
+
         let state = context_vector.unwrap();
-        let pred = self.decoder_forward(input.clone(), state, teaching);
+        let pred = self.decoder_forward(hiddens, state, teaching);
         pred
     }
 }
