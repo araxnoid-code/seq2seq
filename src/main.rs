@@ -98,9 +98,17 @@ fn main() {
             let target: Tensor<MyBackend, 1, Int> = target.clone().reshape([-1]);
             let target = Tensor::cat(vec![target, Tensor::from([0])], 0);
             let loss = loss_fn.forward(pred, target);
-            losses.push(loss);
+            losses.push(loss.clone());
 
-            println!("{idx}/{}", input_tensor_copy.len());
+            println!(
+                "{idx}/{} => {}",
+                input_tensor_copy.len(),
+                loss.clone().into_scalar()
+            );
+
+            let grads = loss.backward();
+            let grads = GradientsParams::from_grads(grads, &seq2seq_model);
+            seq2seq_model = optim.step(0.0001, seq2seq_model, grads);
         }
         // break;
         let losses = Tensor::cat(losses, 0);
@@ -109,11 +117,11 @@ fn main() {
         let loss_scalar = loss.clone().into_scalar();
         println!("{i} | loss {loss_scalar}");
 
-        let grads = loss.backward();
-        let grads = GradientsParams::from_grads(grads, &seq2seq_model);
+        // let grads = loss.backward();
+        // let grads = GradientsParams::from_grads(grads, &seq2seq_model);
+        // seq2seq_model = optim.step(0.0001, seq2seq_model, grads);
 
-        seq2seq_model = optim.step(0.0001, seq2seq_model, grads);
-
+        // clear
         let test_input = input_tensor_copy.get(0).unwrap().clone();
         let pred = seq2seq_model.forward(test_input, None);
         let max_pred = pred.argmax(1);
