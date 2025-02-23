@@ -29,7 +29,7 @@ impl<B: Backend> Seq2Seq<B> {
         let embedded = self.encoder_embedding.forward(input);
         let mut state_save: Option<LstmState<B, 2>> = None;
         let mut hiddens = vec![];
-        for i in 0..20 {
+        for i in 0..10 {
             let embedded_slice = embedded.clone().slice([0..1, i..i + 1]);
             if let Some(state) = state_save {
                 let (_, state) = self.encoder_lstm.forward(embedded_slice, Some(state));
@@ -61,7 +61,7 @@ impl<B: Backend> Seq2Seq<B> {
             let input_model = Tensor::cat(input_model, 1);
             let embedded = self.decoder_embedding.forward(input_model);
             let mut state_model = state;
-            for i in 0..21 {
+            for i in 0..11 {
                 let embedded_slice = embedded.clone().slice([0..1, i..i + 1]);
                 let (output, state) = self.decoder_lstm.forward(embedded_slice, Some(state_model));
                 let output = self.attention(output.clone(), hiddens.clone());
@@ -73,7 +73,7 @@ impl<B: Backend> Seq2Seq<B> {
         } else {
             let mut input: Tensor<B, 2, Int> = Tensor::from([[0]]);
             let mut state_model = state;
-            for _ in 0..21 {
+            for _ in 0..11 {
                 let embedded = self.decoder_embedding.forward(input.clone());
                 let (output, state) = self.decoder_lstm.forward(embedded, Some(state_model));
                 let output = self.attention(output.clone(), hiddens.clone());

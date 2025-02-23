@@ -70,7 +70,7 @@ fn main() {
 
     let mut output_tensor = Vec::new();
     for output in output_tokens {
-        let mut list = [1; 20];
+        let mut list = [1; 10];
         for (idx, word) in output.iter().enumerate() {
             list[idx] = word.clone() as i32;
         }
