@@ -1,7 +1,10 @@
 use burn::{
     config::Config,
     module::Module,
-    nn::{Embedding, EmbeddingConfig, Linear, LinearConfig, Lstm, LstmConfig, LstmState},
+    nn::{
+        Dropout, DropoutConfig, Embedding, EmbeddingConfig, Linear, LinearConfig, Lstm, LstmConfig,
+        LstmState,
+    },
     prelude::Backend,
     tensor::{
         activation::{relu, softmax},
@@ -14,11 +17,13 @@ pub struct Seq2Seq<B: Backend> {
     // encoder
     encoder_embedding: Embedding<B>,
     encoder_lstm: Lstm<B>,
+    encoder_dropout: Dropout,
     //decoder
     decoder_embedding: Embedding<B>,
     decoder_lstm: Lstm<B>,
     decoder_linear: Linear<B>,
     decoder_linear_2: Linear<B>,
+    decoder_dropout: Dropout,
 }
 
 impl<B: Backend> Seq2Seq<B> {
@@ -26,7 +31,9 @@ impl<B: Backend> Seq2Seq<B> {
         &self,
         input: Tensor<B, 2, Int>,
     ) -> (Option<LstmState<B, 2>>, Vec<Tensor<B, 2>>) {
-        let embedded = self.encoder_embedding.forward(input);
+        let embedded = self
+            .encoder_dropout
+            .forward(self.encoder_embedding.forward(input));
         let mut state_save: Option<LstmState<B, 2>> = None;
         let mut hiddens = vec![];
         for i in 0..10 {
@@ -59,7 +66,9 @@ impl<B: Backend> Seq2Seq<B> {
         if let Some(target) = teaching.clone() {
             let input_model = vec![Tensor::from([[0]]), target.clone()];
             let input_model = Tensor::cat(input_model, 1);
-            let embedded = self.decoder_embedding.forward(input_model);
+            let embedded = self
+                .decoder_dropout
+                .forward(self.decoder_embedding.forward(input_model));
             let mut state_model = state;
             for i in 0..11 {
                 let embedded_slice = embedded.clone().slice([0..1, i..i + 1]);
@@ -134,6 +143,7 @@ impl Seq2SeqConfig {
             // encoder
             encoder_embedding: EmbeddingConfig::new(self.input, self.hidden).init(device),
             encoder_lstm: LstmConfig::new(self.hidden, self.hidden, true).init(device),
+            encoder_dropout: DropoutConfig::new(0.3).init(),
             // decode.init
             decoder_embedding: EmbeddingConfig::new(self.output, self.hidden).init(device),
             decoder_lstm: LstmConfig::new(self.hidden, self.hidden, true).init(device),
@@ -141,6 +151,7 @@ impl Seq2SeqConfig {
                 .init(device),
             decoder_linear_2: LinearConfig::new(self.hidden + self.hidden, self.output)
                 .init(device),
+            decoder_dropout: DropoutConfig::new(0.3).init(),
         }
     }
 }
