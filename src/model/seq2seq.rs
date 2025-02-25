@@ -6,10 +6,7 @@ use burn::{
         LstmState,
     },
     prelude::Backend,
-    tensor::{
-        activation::{relu, softmax},
-        Int, Tensor,
-    },
+    tensor::{activation::softmax, Int, Tensor},
 };
 
 #[derive(Debug, Module)]
@@ -30,30 +27,33 @@ impl<B: Backend> Seq2Seq<B> {
     pub fn encoder_forward(
         &self,
         input: Tensor<B, 2, Int>,
-    ) -> (Option<LstmState<B, 2>>, Vec<Tensor<B, 2>>) {
+    ) -> (LstmState<B, 2>, Vec<Tensor<B, 2>>) {
         let embedded = self
             .encoder_dropout
             .forward(self.encoder_embedding.forward(input));
-        let mut state_save: Option<LstmState<B, 2>> = None;
-        let mut hiddens = vec![];
-        for i in 0..10 {
-            let embedded_slice = embedded.clone().slice([0..1, i..i + 1]);
-            if let Some(state) = state_save {
-                let (_, state) = self.encoder_lstm.forward(embedded_slice, Some(state));
-                // save for attention
-                hiddens.push(state.hidden.clone());
-                //
-                state_save = Some(state);
-            } else {
-                let (_, state) = self.encoder_lstm.forward(embedded_slice, None);
-                // save for attention
-                hiddens.push(state.hidden.clone());
-                //
-                state_save = Some(state);
-            }
-        }
 
-        (state_save, hiddens)
+        let (_, state) = self.encoder_lstm.forward(embedded, None);
+
+        // let mut state_save: Option<LstmState<B, 2>> = None;
+        let hiddens = vec![];
+        // for i in 0..10 {
+        //     let embedded_slice = embedded.clone().slice([0..1, i..i + 1]);
+        //     if let Some(state) = state_save {
+        //         let (_, state) = self.encoder_lstm.forward(embedded_slice, Some(state));
+        //         // save for attention
+        //         hiddens.push(state.hidden.clone());
+        //         //
+        //         state_save = Some(state);
+        //     } else {
+        //         let (_, state) = self.encoder_lstm.forward(embedded_slice, None);
+        //         // save for attention
+        //         hiddens.push(state.hidden.clone());
+        //         //
+        //         state_save = Some(state);
+        //     }
+        // }
+
+        (state, hiddens)
     }
 
     pub fn decoder_forward(
@@ -66,16 +66,19 @@ impl<B: Backend> Seq2Seq<B> {
         if let Some(target) = teaching.clone() {
             let input_model = vec![Tensor::from([[0]]), target.clone()];
             let input_model = Tensor::cat(input_model, 1);
-            let embedded = self
-                .decoder_dropout
-                .forward(self.decoder_embedding.forward(input_model));
             let mut state_model = state;
+
             for i in 0..11 {
-                let embedded_slice = embedded.clone().slice([0..1, i..i + 1]);
-                let (output, state) = self.decoder_lstm.forward(embedded_slice, Some(state_model));
-                let output = self.attention(output.clone(), hiddens.clone());
+                let input = input_model.clone().slice([0..1, i..i + 1]);
+                let embedded = self
+                    .decoder_dropout
+                    .forward(self.decoder_embedding.forward(input));
+
+                let (output, state) = self.decoder_lstm.forward(embedded, Some(state_model));
                 let output = self.decoder_linear_2.forward(output);
-                let output = softmax(output, 1);
+                let output = softmax(output.reshape([0, -1]), 1);
+                println!("{output}");
+                println!("================================");
                 outputs.push(output);
                 state_model = state;
             }
@@ -97,7 +100,9 @@ impl<B: Backend> Seq2Seq<B> {
             }
         }
 
-        Tensor::cat(outputs, 0)
+        let outputs = Tensor::cat(outputs, 0);
+        // println!("{outputs}");
+        outputs
     }
 
     pub fn attention(&self, tensor: Tensor<B, 3>, hiddens: Vec<Tensor<B, 2>>) -> Tensor<B, 2> {
@@ -124,9 +129,10 @@ impl<B: Backend> Seq2Seq<B> {
     ) -> Tensor<B, 2> {
         let (context_vector, hiddens) = self.encoder_forward(input.clone());
 
-        let state = context_vector.unwrap();
-        let pred = self.decoder_forward(hiddens, state, teaching);
-        pred
+        // let state = context_vector.unwrap();
+        let pred = self.decoder_forward(hiddens, context_vector, teaching);
+        // pred
+        Tensor::from([[0]])
     }
 }
 
@@ -149,8 +155,7 @@ impl Seq2SeqConfig {
             decoder_lstm: LstmConfig::new(self.hidden, self.hidden, true).init(device),
             decoder_linear: LinearConfig::new(self.hidden + self.hidden, self.hidden + self.hidden)
                 .init(device),
-            decoder_linear_2: LinearConfig::new(self.hidden + self.hidden, self.output)
-                .init(device),
+            decoder_linear_2: LinearConfig::new(self.hidden, self.output).init(device),
             decoder_dropout: DropoutConfig::new(0.3).init(),
         }
     }
