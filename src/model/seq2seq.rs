@@ -3,10 +3,13 @@ use burn::{
     module::Module,
     nn::{
         Dropout, DropoutConfig, Embedding, EmbeddingConfig, Linear, LinearConfig, Lstm, LstmConfig,
-        LstmState,
+        LstmState, Tanh,
     },
     prelude::Backend,
-    tensor::{activation::softmax, Int, Tensor},
+    tensor::{
+        activation::{softmax, tanh},
+        Int, Tensor,
+    },
 };
 
 #[derive(Debug, Module)]
@@ -21,6 +24,10 @@ pub struct Seq2Seq<B: Backend> {
     decoder_linear: Linear<B>,
     decoder_linear_2: Linear<B>,
     decoder_dropout: Dropout,
+    //attention
+    linear_wa: Linear<B>,
+    linear_ua: Linear<B>,
+    linear_va: Linear<B>,
 }
 
 impl<B: Backend> Seq2Seq<B> {
@@ -34,24 +41,7 @@ impl<B: Backend> Seq2Seq<B> {
 
         let (_, state) = self.encoder_lstm.forward(embedded, None);
 
-        // let mut state_save: Option<LstmState<B, 2>> = None;
         let hiddens = vec![];
-        // for i in 0..10 {
-        //     let embedded_slice = embedded.clone().slice([0..1, i..i + 1]);
-        //     if let Some(state) = state_save {
-        //         let (_, state) = self.encoder_lstm.forward(embedded_slice, Some(state));
-        //         // save for attention
-        //         hiddens.push(state.hidden.clone());
-        //         //
-        //         state_save = Some(state);
-        //     } else {
-        //         let (_, state) = self.encoder_lstm.forward(embedded_slice, None);
-        //         // save for attention
-        //         hiddens.push(state.hidden.clone());
-        //         //
-        //         state_save = Some(state);
-        //     }
-        // }
 
         (state, hiddens)
     }
@@ -66,6 +56,7 @@ impl<B: Backend> Seq2Seq<B> {
         if let Some(target) = teaching.clone() {
             let input_model = vec![Tensor::from([[0]]), target.clone()];
             let input_model = Tensor::cat(input_model, 1);
+            let encoder_hidden = state.hidden.clone();
             let mut state_model = state;
 
             for i in 0..11 {
@@ -75,10 +66,9 @@ impl<B: Backend> Seq2Seq<B> {
                     .forward(self.decoder_embedding.forward(input));
 
                 let (output, state) = self.decoder_lstm.forward(embedded, Some(state_model));
+                self.bahdanau_attention(encoder_hidden.clone(), output.clone());
                 let output = self.decoder_linear_2.forward(output);
                 let output = softmax(output.reshape([0, -1]), 1);
-                println!("{output}");
-                println!("================================");
                 outputs.push(output);
                 state_model = state;
             }
@@ -86,11 +76,13 @@ impl<B: Backend> Seq2Seq<B> {
             let mut input: Tensor<B, 2, Int> = Tensor::from([[0]]);
             let mut state_model = state;
             for _ in 0..11 {
-                let embedded = self.decoder_embedding.forward(input.clone());
+                let embedded = self
+                    .decoder_dropout
+                    .forward(self.decoder_embedding.forward(input.clone()));
                 let (output, state) = self.decoder_lstm.forward(embedded, Some(state_model));
-                let output = self.attention(output.clone(), hiddens.clone());
+                // let output = self.attention(output.clone(), hiddens.clone());
                 let output = self.decoder_linear_2.forward(output);
-                let output = softmax(output, 1);
+                let output = softmax(output.reshape([0, -1]), 1);
                 outputs.push(output.clone());
 
                 // update input
@@ -101,8 +93,22 @@ impl<B: Backend> Seq2Seq<B> {
         }
 
         let outputs = Tensor::cat(outputs, 0);
-        // println!("{outputs}");
+
         outputs
+    }
+
+    pub fn bahdanau_attention(&self, previous_hidden: Tensor<B, 2>, tensor: Tensor<B, 3>) {
+        let tensor: Tensor<B, 2> = tensor.squeeze(0);
+        let scores = self.linear_va.forward(tanh(
+            self.linear_wa.forward(previous_hidden) + self.linear_ua.forward(tensor),
+        ));
+
+        println!("{scores}");
+        let weight = softmax(scores, 1);
+        println!("{weight}");
+        // println!("{previous_hidden}");
+        // println!("=========================");
+        // println!("{tensor}");
     }
 
     pub fn attention(&self, tensor: Tensor<B, 3>, hiddens: Vec<Tensor<B, 2>>) -> Tensor<B, 2> {
@@ -129,10 +135,8 @@ impl<B: Backend> Seq2Seq<B> {
     ) -> Tensor<B, 2> {
         let (context_vector, hiddens) = self.encoder_forward(input.clone());
 
-        // let state = context_vector.unwrap();
         let pred = self.decoder_forward(hiddens, context_vector, teaching);
-        // pred
-        Tensor::from([[0]])
+        pred
     }
 }
 
@@ -157,6 +161,10 @@ impl Seq2SeqConfig {
                 .init(device),
             decoder_linear_2: LinearConfig::new(self.hidden, self.output).init(device),
             decoder_dropout: DropoutConfig::new(0.3).init(),
+            // bahdanau
+            linear_wa: LinearConfig::new(self.hidden, self.hidden).init(device),
+            linear_ua: LinearConfig::new(self.hidden, self.hidden).init(device),
+            linear_va: LinearConfig::new(self.hidden, 1).init(device),
         }
     }
 }

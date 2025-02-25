@@ -88,15 +88,18 @@ fn main() {
     let epoch = 100;
 
     for i in 0..epoch {
+        // break;
         let mut losses = vec![];
         for (idx, input) in input_tensor_copy.iter().enumerate() {
             let target = output_tensor_copy.get(idx).unwrap().clone();
 
             let pred = seq2seq_model.forward(input.clone(), Some(target.clone()));
-            // break;
+            break;
 
             let target: Tensor<MyBackend, 1, Int> = target.clone().reshape([-1]);
             let target = Tensor::cat(vec![target, Tensor::from([1])], 0);
+            println!("{pred}");
+            println!("{target}");
             let loss = loss_fn.forward(pred, target);
             losses.push(loss.clone());
 
@@ -110,7 +113,7 @@ fn main() {
             // let grads = GradientsParams::from_grads(grads, &seq2seq_model);
             // seq2seq_model = optim.step(0.0001, seq2seq_model, grads);
         }
-        // break;
+        break;
         // let losses = Tensor::cat(losses, 0);
         // let losses_sum = losses.sum();
         // let loss = losses_sum / input_tensor_copy.len() as f32;
