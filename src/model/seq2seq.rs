@@ -99,13 +99,11 @@ impl<B: Backend> Seq2Seq<B> {
 
     pub fn bahdanau_attention(&self, previous_hidden: Tensor<B, 2>, tensor: Tensor<B, 3>) {
         let tensor: Tensor<B, 2> = tensor.squeeze(0);
-        let scores = self.linear_va.forward(tanh(
-            self.linear_wa.forward(previous_hidden) + self.linear_ua.forward(tensor),
-        ));
+        let scores = tanh(self.linear_wa.forward(previous_hidden) + self.linear_ua.forward(tensor));
 
         println!("{scores}");
-        let weight = softmax(scores, 1);
-        println!("{weight}");
+        // let weight = softmax(scores, 1);
+        // println!("{weight}");
         // println!("{previous_hidden}");
         // println!("=========================");
         // println!("{tensor}");
