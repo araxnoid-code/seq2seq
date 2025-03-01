@@ -78,6 +78,7 @@ impl Tokenizing {
 
     pub fn sentence2index(&self, sentence: &str) -> Vec<i32> {
         let mut result = Vec::new();
+
         for word in sentence.split(" ").collect::<Vec<&str>>() {
             result.push(self.word2index(word));
         }
