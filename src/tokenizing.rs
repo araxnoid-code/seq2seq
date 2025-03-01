@@ -84,4 +84,23 @@ impl Tokenizing {
         }
         result
     }
+
+    pub fn index2word(&self, index: i32) -> String {
+        if let Some(word) = self.index2word.get(&index) {
+            word.clone()
+        } else {
+            "<what?>".to_string()
+        }
+    }
+
+    pub fn index2sentence(&self, vector: Vec<i32>) -> String {
+        let mut sentence = String::new();
+        for index in vector {
+            let word = self.index2word(index);
+            sentence.push_str(word.as_str());
+            sentence.push_str(" ");
+        }
+
+        sentence
+    }
 }

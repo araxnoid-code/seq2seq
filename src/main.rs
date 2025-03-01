@@ -32,14 +32,14 @@ fn main() {
     }
 
     // set up model
-    let seq2seq_config = Seq2SeqConfig::new(token.count, 32, token.count, 0.3);
+    let seq2seq_config = Seq2SeqConfig::new(token.count, 64, token.count, 0.3);
     let mut seq2seq_model = seq2seq_config.init::<MyBackend>(&device);
     let loss_fn = CrossEntropyLossConfig::new().init::<MyBackend>(&device);
     let mut optim = AdamConfig::new().init();
-    let epochs = 10;
+    let epochs = 50;
 
     for epoch in 0..epochs {
-        break;
+        // break;
         let mut avg = 0.0;
         for (idx, (ask, ans)) in dataset.clone().iter().enumerate() {
             println!("{idx}/{}", dataset.len());
@@ -74,10 +74,20 @@ fn main() {
     for (ask, ans) in dataset {
         seq2seq_model.valid();
         let ask = ask.clone().unsqueeze();
-        let context_vector = seq2seq_model.encoder_forward(ask);
+        let context_vector = seq2seq_model.encoder_forward(ask.clone());
         let logits = seq2seq_model.decoder_forward(context_vector);
-        let pred = softmax(logits, 1).argmax(1).permute([1, 0]);
-        // pred.iter_dim(1).map(|value| println!("{value}")).collect::<>();
-        println!("{pred}");
+        let pred: Tensor<MyBackend, 1, Int> =
+            softmax(logits, 1).argmax(1).permute([1, 0]).squeeze(0);
+
+        let ask_vector: Vec<i32> = ask.to_data().to_vec().unwrap();
+        let ans_vector: Vec<i32> = ans.to_data().to_vec().unwrap();
+        let pred_vector: Vec<i32> = pred.to_data().to_vec().unwrap();
+
+        let ask_sentence = token.index2sentence(ask_vector);
+        let ans_sentence = token.index2sentence(ans_vector);
+        let pred_sentence = token.index2sentence(pred_vector);
+        println!(
+            "{ask_sentence} | {pred_sentence} \n {ans_sentence} \n =========================="
+        );
     }
 }
