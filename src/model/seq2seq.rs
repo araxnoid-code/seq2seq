@@ -1,140 +1,31 @@
 use burn::{
     config::Config,
-    module::Module,
-    nn::{
-        Dropout, DropoutConfig, Embedding, EmbeddingConfig, Linear, LinearConfig, Lstm, LstmConfig,
-        LstmState, Tanh,
-    },
+    nn::{Dropout, DropoutConfig, Embedding, EmbeddingConfig, Lstm, LstmConfig, LstmState},
     prelude::Backend,
-    tensor::{
-        activation::{softmax, tanh},
-        Int, Tensor,
-    },
+    tensor::{Int, Tensor},
 };
 
-#[derive(Debug, Module)]
 pub struct Seq2Seq<B: Backend> {
     // encoder
     encoder_embedding: Embedding<B>,
-    encoder_lstm: Lstm<B>,
     encoder_dropout: Dropout,
-    //decoder
-    decoder_embedding: Embedding<B>,
-    decoder_lstm: Lstm<B>,
-    decoder_linear: Linear<B>,
-    decoder_linear_2: Linear<B>,
-    decoder_dropout: Dropout,
-    //attention
-    linear_wa: Linear<B>,
-    linear_ua: Linear<B>,
-    linear_va: Linear<B>,
+    encoder_lstm: Lstm<B>,
 }
 
 impl<B: Backend> Seq2Seq<B> {
-    pub fn encoder_forward(
-        &self,
-        input: Tensor<B, 2, Int>,
-    ) -> (LstmState<B, 2>, Vec<Tensor<B, 2>>) {
-        let embedded = self
-            .encoder_dropout
-            .forward(self.encoder_embedding.forward(input));
+    pub fn encoder_forward(&self, input: Tensor<B, 2, Int>) -> LstmState<B, 2> {
+        let shape = input.dims();
+        let mut state: Option<LstmState<B, 2>> = None;
+        for i in 0..shape[shape.len() - 1] {
+            let input = input.clone().slice([0..1, i..i + 1]);
+            let embedded = self
+                .encoder_dropout
+                .forward(self.encoder_embedding.forward(input));
 
-        let (_, state) = self.encoder_lstm.forward(embedded, None);
-
-        let hiddens = vec![];
-
-        (state, hiddens)
-    }
-
-    pub fn decoder_forward(
-        &self,
-        hiddens: Vec<Tensor<B, 2>>,
-        state: LstmState<B, 2>,
-        teaching: Option<Tensor<B, 2, Int>>,
-    ) -> Tensor<B, 2> {
-        let mut outputs = Vec::new();
-        if let Some(target) = teaching.clone() {
-            let input_model = vec![Tensor::from([[0]]), target.clone()];
-            let input_model = Tensor::cat(input_model, 1);
-            let encoder_hidden = state.hidden.clone();
-            let mut state_model = state;
-
-            for i in 0..11 {
-                let input = input_model.clone().slice([0..1, i..i + 1]);
-                let embedded = self
-                    .decoder_dropout
-                    .forward(self.decoder_embedding.forward(input));
-
-                let (output, state) = self.decoder_lstm.forward(embedded, Some(state_model));
-                self.bahdanau_attention(encoder_hidden.clone(), output.clone());
-                let output = self.decoder_linear_2.forward(output);
-                let output = softmax(output.reshape([0, -1]), 1);
-                outputs.push(output);
-                state_model = state;
-            }
-        } else {
-            let mut input: Tensor<B, 2, Int> = Tensor::from([[0]]);
-            let mut state_model = state;
-            for _ in 0..11 {
-                let embedded = self
-                    .decoder_dropout
-                    .forward(self.decoder_embedding.forward(input.clone()));
-                let (output, state) = self.decoder_lstm.forward(embedded, Some(state_model));
-                // let output = self.attention(output.clone(), hiddens.clone());
-                let output = self.decoder_linear_2.forward(output);
-                let output = softmax(output.reshape([0, -1]), 1);
-                outputs.push(output.clone());
-
-                // update input
-                let next_input = output.argmax(1);
-                input = next_input;
-                state_model = state
-            }
+            let (_, lstm_state) = self.encoder_lstm.forward(embedded, state);
+            state = Some(lstm_state);
         }
-
-        let outputs = Tensor::cat(outputs, 0);
-
-        outputs
-    }
-
-    pub fn bahdanau_attention(&self, previous_hidden: Tensor<B, 2>, tensor: Tensor<B, 3>) {
-        let tensor: Tensor<B, 2> = tensor.squeeze(0);
-        let scores = tanh(self.linear_wa.forward(previous_hidden) + self.linear_ua.forward(tensor));
-
-        println!("{scores}");
-        // let weight = softmax(scores, 1);
-        // println!("{weight}");
-        // println!("{previous_hidden}");
-        // println!("=========================");
-        // println!("{tensor}");
-    }
-
-    pub fn attention(&self, tensor: Tensor<B, 3>, hiddens: Vec<Tensor<B, 2>>) -> Tensor<B, 2> {
-        let tensor = tensor.clone().reshape([0, -1]);
-        let mut matmuls = vec![];
-        for hidden in hiddens.clone() {
-            let hidden = hidden.permute([1, 0]);
-            let matmul = tensor.clone().matmul(hidden);
-            matmuls.push(matmul);
-        }
-        let hiddens = Tensor::cat(hiddens, 0);
-        let matmuls = Tensor::cat(matmuls, 1);
-        let matmuls = softmax(matmuls, 1);
-
-        let matmuls = matmuls.matmul(hiddens);
-        let tensor = Tensor::cat(vec![tensor, matmuls], 1);
-        tensor
-    }
-
-    pub fn forward(
-        &self,
-        input: Tensor<B, 2, Int>,
-        teaching: Option<Tensor<B, 2, Int>>,
-    ) -> Tensor<B, 2> {
-        let (context_vector, hiddens) = self.encoder_forward(input.clone());
-
-        let pred = self.decoder_forward(hiddens, context_vector, teaching);
-        pred
+        state.unwrap()
     }
 }
 
@@ -143,26 +34,15 @@ pub struct Seq2SeqConfig {
     input: usize,
     hidden: usize,
     output: usize,
+    dropout: f64,
 }
 
 impl Seq2SeqConfig {
     pub fn init<B: Backend>(&self, device: &B::Device) -> Seq2Seq<B> {
         Seq2Seq {
-            // encoder
             encoder_embedding: EmbeddingConfig::new(self.input, self.hidden).init(device),
+            encoder_dropout: DropoutConfig::new(self.dropout).init(),
             encoder_lstm: LstmConfig::new(self.hidden, self.hidden, true).init(device),
-            encoder_dropout: DropoutConfig::new(0.3).init(),
-            // decode.init
-            decoder_embedding: EmbeddingConfig::new(self.output, self.hidden).init(device),
-            decoder_lstm: LstmConfig::new(self.hidden, self.hidden, true).init(device),
-            decoder_linear: LinearConfig::new(self.hidden + self.hidden, self.hidden + self.hidden)
-                .init(device),
-            decoder_linear_2: LinearConfig::new(self.hidden, self.output).init(device),
-            decoder_dropout: DropoutConfig::new(0.3).init(),
-            // bahdanau
-            linear_wa: LinearConfig::new(self.hidden, self.hidden).init(device),
-            linear_ua: LinearConfig::new(self.hidden, self.hidden).init(device),
-            linear_va: LinearConfig::new(self.hidden, 1).init(device),
         }
     }
 }

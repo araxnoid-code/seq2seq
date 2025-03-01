@@ -1,12 +1,15 @@
+mod model;
 mod tokenizing;
 use burn::{
-    backend::{Autodiff, Wgpu},
+    backend::{wgpu::WgpuDevice, Autodiff, Wgpu},
     tensor::{Int, Tensor},
 };
+use model::*;
 use tokenizing::*;
 
 fn main() {
     type MyBackend = Autodiff<Wgpu>;
+    let device = WgpuDevice::default();
     // setup token
     let mut token = Tokenizing::default();
     let data_list = token.get_data("data.txt");
@@ -23,5 +26,17 @@ fn main() {
         let ans_tensor = Tensor::cat(vec![ans_tensor, Tensor::from([1])], 0);
 
         dataset.push((ask_tensor, ans_tensor));
+    }
+
+    // set up model
+    let seq2seq_config = Seq2SeqConfig::new(token.count, 32, token.count, 0.3);
+    let seq2seq_model = seq2seq_config.init::<MyBackend>(&device);
+
+    for (ask, ans) in dataset {
+        let ask = ask.unsqueeze();
+        let context_vector = seq2seq_model.encoder_forward(ask);
+        println!("{}", context_vector.hidden);
+
+        break;
     }
 }
