@@ -25,7 +25,7 @@ impl Default for Tokenizing {
 use std::{collections::HashMap, fs::File, io::Read};
 
 impl Tokenizing {
-    pub fn get_data(&mut self, location: &str) {
+    pub fn get_data(&mut self, location: &str) -> Vec<(String, String)> {
         let mut data = String::new();
         File::open(location)
             .unwrap()
@@ -38,7 +38,8 @@ impl Tokenizing {
         let data_list = data_list
             .into_iter()
             .map(|value| {
-                let split = value.split(" | ").collect::<Vec<&str>>();
+                let sentence = value.replace(",", "").replace(".", "").replace("?", "");
+                let split = sentence.split(" | ").collect::<Vec<&str>>();
                 (split[0].to_string(), split[1].to_string())
             })
             .collect::<Vec<(String, String)>>();
@@ -47,10 +48,11 @@ impl Tokenizing {
             self.set_up_sentence_to_index(ask);
             self.set_up_sentence_to_index(ans);
         }
+
+        data_list
     }
 
-    pub fn set_up_sentence_to_index(&mut self, sentence: &str) {
-        let sentence = sentence.replace(",", "").replace(".", "").replace("?", "");
+    fn set_up_sentence_to_index(&mut self, sentence: &str) {
         let words = sentence.split(" ").collect::<Vec<&str>>();
 
         for word in words {
@@ -58,11 +60,27 @@ impl Tokenizing {
         }
     }
 
-    pub fn set_up_word_to_index(&mut self, word: &str) {
+    fn set_up_word_to_index(&mut self, word: &str) {
         if let None = self.word2index.get(word) {
             self.word2index.insert(word.to_string(), self.count as i32);
             self.index2word.insert(self.count as i32, word.to_string());
             self.count += 1;
         }
+    }
+
+    pub fn word2index(&self, word: &str) -> i32 {
+        if let Some(index) = self.word2index.get(word) {
+            *index
+        } else {
+            -1
+        }
+    }
+
+    pub fn sentence2index(&self, sentence: &str) -> Vec<i32> {
+        let mut result = Vec::new();
+        for word in sentence.split(" ").collect::<Vec<&str>>() {
+            result.push(self.word2index(word));
+        }
+        result
     }
 }
