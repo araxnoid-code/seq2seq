@@ -1,0 +1,160 @@
+seq2seq data
+epochs = 50
+hidden = 124
+sentence = 50
+lr = 0.001
+loss_fn = crossentropyloss
+optim = adam
+
+// result
+last loss => 0.25800228
+hi how are you doing <EOS>(ask)  | i'm fine how about yourself <EOS> <EOS> <EOS> <EOS> <EOS> <EOS> <EOS>(prediction answer)
+ i'm fine how about yourself <EOS>  (target answer)
+ ==========================
+i'm fine how about yourself <EOS>  | i'm pretty good thanks for asking <EOS> <EOS> <EOS> <EOS> <EOS> <EOS>
+ i'm pretty good thanks for asking <EOS>
+ ==========================
+i'm pretty good thanks for asking <EOS>  | no problem so how have have been been <EOS> <EOS> <EOS> <EOS>
+ no problem so how have you been <EOS>
+ ==========================
+no problem so how have you been <EOS>  | i've been great what about you <EOS> <EOS> <EOS> <EOS> <EOS> <EOS>
+ i've been great what about you <EOS>
+ ==========================
+i've been great what about you <EOS>  | i've been good good in school right now now <EOS> <EOS> <EOS>
+ i've been good i'm in school right now <EOS>
+ ==========================
+i've been good i'm in school right now <EOS>  | what school do you you to <EOS> <EOS> <EOS> <EOS> <EOS> <EOS>
+ what school do you go to <EOS>
+ ==========================
+what school do you go to <EOS>  | i go to pcc <EOS> <EOS> <EOS> <EOS> <EOS> <EOS> <EOS> <EOS>
+ i go to pcc <EOS>
+ ==========================
+i go to pcc <EOS>  | do you like it there <EOS> <EOS> <EOS> <EOS> <EOS> <EOS> <EOS>
+ do you like it there <EOS>
+ ==========================
+do you like it there <EOS>  | it's okay it's it's really big big campus <EOS> <EOS> <EOS> <EOS>
+ it's okay it's a really big campus <EOS>
+ ==========================
+it's okay it's a really big campus <EOS>  | good luck with school <EOS> <EOS> <EOS> <EOS> <EOS> <EOS> <EOS> <EOS>
+ good luck with school <EOS>
+ ==========================
+good luck with school <EOS>  | thank you very much <EOS> <EOS> <EOS> <EOS> <EOS> <EOS> <EOS> <EOS>
+ thank you very much <EOS>
+ ==========================
+how's it going <EOS>  | i'm doing well how about you <EOS> <EOS> <EOS> <EOS> <EOS> <EOS>
+ i'm doing well how about you <EOS>
+ ==========================
+i'm doing well how about you <EOS>  | never better thanks <EOS> <EOS> <EOS> <EOS> <EOS> <EOS> <EOS> <EOS> <EOS>
+ never better thanks <EOS>
+ ==========================
+never better thanks <EOS>  | so how have you been lately <EOS> <EOS> <EOS> <EOS> <EOS> <EOS>
+ so how have you been lately <EOS>
+ ==========================
+so how have you been lately <EOS>  | i've actually been pretty good good you <EOS> <EOS> <EOS> <EOS> <EOS>
+ i've actually been pretty good you <EOS>
+ ==========================
+i've actually been pretty good you <EOS>  | i'm actually in school right now <EOS> <EOS> <EOS> <EOS> <EOS> <EOS>
+ i'm actually in school right now <EOS>
+ ==========================
+i'm actually in school right now <EOS>  | which school do you attend <EOS> <EOS> <EOS> <EOS> <EOS> <EOS> <EOS>
+ which school do you attend <EOS>
+ ==========================
+which school do you attend <EOS>  | i'm attending pcc right now <EOS> <EOS> <EOS> <EOS> <EOS> <EOS> <EOS>
+ i'm attending pcc right now <EOS>
+ ==========================
+i'm attending pcc right now <EOS>  | are you enjoying it there <EOS> <EOS> <EOS> <EOS> <EOS> <EOS> <EOS>
+ are you enjoying it there <EOS>
+ ==========================
+are you enjoying it there <EOS>  | it's not bad there are are a lot of people <EOS> <EOS>
+ it's not bad there are a lot of people there <EOS>
+ ==========================
+it's not bad there are a lot of people there <EOS>  | good luck with that that <EOS> <EOS> <EOS> <EOS> <EOS> <EOS> <EOS>
+ good luck with that <EOS>
+ ==========================
+good luck with that <EOS>  | thanks <EOS> <EOS> <EOS> <EOS> <EOS> <EOS> <EOS> <EOS> <EOS> <EOS> <EOS>
+ thanks <EOS>
+ ==========================
+how are you doing today <EOS>  | i'm doing great what about you <EOS> <EOS> <EOS> <EOS> <EOS> <EOS>
+ i'm doing great what about you <EOS>
+ ==========================
+i'm doing great what about you <EOS>  | i'm absolutely lovely thank thank <EOS> <EOS> <EOS> <EOS> <EOS> <EOS> <EOS>
+ i'm absolutely lovely thank you <EOS>
+ ==========================
+i'm absolutely lovely thank you <EOS>  | everything's been good with you <EOS> <EOS> <EOS> <EOS> <EOS> <EOS> <EOS>
+ everything's been good with you <EOS>
+ ==========================
+everything's been good with you <EOS>  | i haven't been better better about yourself <EOS> <EOS> <EOS> <EOS> <EOS>
+ i haven't been better how about yourself <EOS>
+ ==========================
+i haven't been better how about yourself <EOS>  | i started school school <EOS> <EOS> <EOS> <EOS> <EOS> <EOS> <EOS> <EOS>
+ i started school recently <EOS>
+ ==========================
+i started school recently <EOS>  | where are you going to school <EOS> <EOS> <EOS> <EOS> <EOS> <EOS>
+ where are you going to school <EOS>
+ ==========================
+where are you going to school <EOS>  | i'm going to pcc <EOS> <EOS> <EOS> <EOS> <EOS> <EOS> <EOS> <EOS>
+ i'm going to pcc <EOS>
+ ==========================
+i'm going to pcc <EOS>  | how do you like it so far <EOS> <EOS> <EOS> <EOS> <EOS>
+ how do you like it so far <EOS>
+ ==========================
+how do you like it so far <EOS>  | i'm been good about about <EOS> <EOS> <EOS> <EOS> <EOS> <EOS> <EOS>
+ i like it so far my classes are pretty good right now <EOS>
+ ==========================
+i like it so far my classes are pretty good right now <EOS>  | i wish you luck <EOS> <EOS> <EOS> <EOS> <EOS> <EOS> <EOS> <EOS>
+ i wish you luck <EOS>
+ ==========================
+it's an ugly day today <EOS>  | i know i think it may rain <EOS> <EOS> <EOS> <EOS> <EOS>
+ i know i think it may rain <EOS>
+ ==========================
+i know i think it may rain <EOS>  | it's the middle of summer it shouldn't rain today <EOS> <EOS> <EOS>
+ it's the middle of summer it shouldn't rain today <EOS>
+ ==========================
+it's the middle of summer it shouldn't rain today <EOS>  | that would be weird <EOS> <EOS> <EOS> <EOS> <EOS> <EOS> <EOS> <EOS>
+ that would be weird <EOS>
+ ==========================
+that would be weird <EOS>  | yeah especially since it's ninety degrees outside <EOS> <EOS> <EOS> <EOS> <EOS>
+ yeah especially since it's ninety degrees outside <EOS>
+ ==========================
+yeah especially since it's ninety degrees outside <EOS>  | i know it it right <EOS> <EOS> <EOS> <EOS> <EOS> <EOS> <EOS>
+ i know it would be horrible if it rained and it was hot outside <EOS>
+ ==========================
+i know it would be horrible if it rained and it was hot outside <EOS>  | yes it would be <EOS> <EOS> <EOS> <EOS> <EOS> <EOS> <EOS> <EOS>
+ yes it would be <EOS>
+ ==========================
+yes it would be  <EOS>  | i really wish it wasn't so hot every day <EOS> <EOS> <EOS>
+ i really wish it wasn't so hot every day <EOS>
+ ==========================
+i really wish it wasn't so hot every day  <EOS>  | me too i can't wait until winter <EOS> <EOS> <EOS> <EOS> <EOS>
+ me too i can't wait until winter <EOS>
+ ==========================
+me too i can't wait until winter <EOS>  | i like winter too but sometimes it gets too <EOS> <EOS> <EOS>
+ i like winter too but sometimes it gets too cold <EOS>
+ ==========================
+i like winter too but sometimes it gets too cold <EOS>  | i'd rather be cold than hot <EOS> <EOS> <EOS> <EOS> <EOS> <EOS>
+ i'd rather be cold than hot <EOS>
+ ==========================
+i'd rather be cold than hot <EOS>  | me too <EOS> <EOS> <EOS> <EOS> <EOS> <EOS> <EOS> <EOS> <EOS> <EOS>
+ me too <EOS>
+ ==========================
+it doesn't look very nice outside today <EOS>  | you're right i think going going to rain later <EOS> <EOS> <EOS>
+ you're right i think it's going to rain later <EOS>
+ ==========================
+you're right i think it's going to rain later <EOS>  | in the middle of the summer it shouldn't be raining <EOS> <EOS>
+ in the middle of the summer it shouldn't be raining <EOS>
+ ==========================
+in the middle of the summer it shouldn't be raining <EOS>  | that wouldn't seem right <EOS> <EOS> <EOS> <EOS> <EOS> <EOS> <EOS> <EOS>
+ that wouldn't seem right <EOS>
+ ==========================
+that wouldn't seem right <EOS>  | are you it it <EOS> <EOS> <EOS> <EOS> <EOS> <EOS> <EOS> <EOS>
+ considering that it's over ninety degrees outside that would be weird <EOS>
+ ==========================
+considering that it's over ninety degrees outside that would be weird <EOS>  | yeah especially since it's ninety degrees outside <EOS> <EOS> <EOS> <EOS> <EOS>
+ exactly it wouldn't be nice if it started raining it's too hot <EOS>
+ ==========================
+exactly it wouldn't be nice if it started raining it's too hot <EOS>  | i know you're absolutely right <EOS> <EOS> <EOS> <EOS> <EOS> <EOS> <EOS>
+ i know you're absolutely right <EOS>
+ ==========================
+i know you're absolutely right <EOS>  | i wish it would cool off one day <EOS> <EOS> <EOS> <EOS>
+ i wish it would cool off one day <EOS>
+ ==========================

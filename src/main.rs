@@ -32,7 +32,7 @@ fn main() {
     }
 
     // set up model
-    let seq2seq_config = Seq2SeqConfig::new(token.count, 64, token.count, 0.3);
+    let seq2seq_config = Seq2SeqConfig::new(token.count, 124, token.count, 0.3);
     let mut seq2seq_model = seq2seq_config.init::<MyBackend>(&device);
     let loss_fn = CrossEntropyLossConfig::new().init::<MyBackend>(&device);
     let mut optim = AdamConfig::new().init();
