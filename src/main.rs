@@ -1,8 +1,11 @@
 mod model;
 mod tokenizing;
 use burn::{
-    backend::{wgpu::WgpuDevice, Autodiff, Wgpu},
-    tensor::{Int, Tensor},
+    backend::{autodiff::grads::Gradients, wgpu::WgpuDevice, Autodiff, Wgpu},
+    module::AutodiffModule,
+    nn::loss::CrossEntropyLossConfig,
+    optim::{AdaGradStateItem, AdamConfig, GradientsParams, Optimizer},
+    tensor::{activation::softmax, Int, Tensor},
 };
 use model::*;
 use tokenizing::*;
@@ -30,13 +33,51 @@ fn main() {
 
     // set up model
     let seq2seq_config = Seq2SeqConfig::new(token.count, 32, token.count, 0.3);
-    let seq2seq_model = seq2seq_config.init::<MyBackend>(&device);
+    let mut seq2seq_model = seq2seq_config.init::<MyBackend>(&device);
+    let loss_fn = CrossEntropyLossConfig::new().init::<MyBackend>(&device);
+    let mut optim = AdamConfig::new().init();
+    let epochs = 10;
 
-    for (ask, ans) in dataset {
-        let ask = ask.unsqueeze();
-        let context_vector = seq2seq_model.encoder_forward(ask);
-        println!("{}", context_vector.hidden);
-
+    for epoch in 0..epochs {
         break;
+        let mut avg = 0.0;
+        for (idx, (ask, ans)) in dataset.clone().iter().enumerate() {
+            println!("{idx}/{}", dataset.len());
+            let ask = ask.clone().unsqueeze();
+            let context_vector = seq2seq_model.encoder_forward(ask);
+            let logits = seq2seq_model.decoder_forward(context_vector);
+
+            // set up
+            let logit_shape = logits.dims()[0];
+            let target_shape = ans.dims()[0];
+
+            if target_shape < logit_shape {
+                let distance = logit_shape - target_shape;
+                let fill: Tensor<MyBackend, 1, Int> = Tensor::from(&vec![1; distance][..]);
+                let target = Tensor::cat(vec![ans.clone(), fill], 0);
+
+                let loss = loss_fn.forward(logits, target);
+                let loss_scalar = loss.clone().into_scalar();
+                avg += loss_scalar;
+
+                let grads = loss.backward();
+                let grads = GradientsParams::from_grads(grads, &seq2seq_model);
+                seq2seq_model = optim.step(0.001, seq2seq_model, grads);
+            }
+        }
+
+        let avg = avg / dataset.len() as f32;
+        println!("{epoch} => {avg}");
+    }
+
+    // test
+    for (ask, ans) in dataset {
+        seq2seq_model.valid();
+        let ask = ask.clone().unsqueeze();
+        let context_vector = seq2seq_model.encoder_forward(ask);
+        let logits = seq2seq_model.decoder_forward(context_vector);
+        let pred = softmax(logits, 1).argmax(1).permute([1, 0]);
+        // pred.iter_dim(1).map(|value| println!("{value}")).collect::<>();
+        println!("{pred}");
     }
 }
