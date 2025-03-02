@@ -1,10 +1,10 @@
 mod model;
 mod tokenizing;
 use burn::{
-    backend::{autodiff::grads::Gradients, wgpu::WgpuDevice, Autodiff, Wgpu},
+    backend::{wgpu::WgpuDevice, Autodiff, Wgpu},
     module::AutodiffModule,
     nn::loss::CrossEntropyLossConfig,
-    optim::{AdaGradStateItem, AdamConfig, GradientsParams, Optimizer},
+    optim::{AdamConfig, GradientsParams, Optimizer},
     tensor::{activation::softmax, Int, Tensor},
 };
 use model::*;
@@ -36,16 +36,16 @@ fn main() {
     let mut seq2seq_model = seq2seq_config.init::<MyBackend>(&device);
     let loss_fn = CrossEntropyLossConfig::new().init::<MyBackend>(&device);
     let mut optim = AdamConfig::new().init();
-    let epochs = 50;
+    let epochs = 10;
 
     for epoch in 0..epochs {
-        // break;
         let mut avg = 0.0;
         for (idx, (ask, ans)) in dataset.clone().iter().enumerate() {
             println!("{idx}/{}", dataset.len());
             let ask = ask.clone().unsqueeze();
-            let context_vector = seq2seq_model.encoder_forward(ask);
-            let logits = seq2seq_model.decoder_forward(context_vector);
+            let (context_vector, hiddens) = seq2seq_model.encoder_forward(ask);
+            let logits = seq2seq_model.decoder_forward(context_vector, hiddens);
+            // break;
 
             // set up
             let logit_shape = logits.dims()[0];
@@ -64,6 +64,7 @@ fn main() {
                 let grads = GradientsParams::from_grads(grads, &seq2seq_model);
                 seq2seq_model = optim.step(0.001, seq2seq_model, grads);
             }
+            // break;
         }
 
         let avg = avg / dataset.len() as f32;
@@ -72,10 +73,11 @@ fn main() {
 
     // test
     for (ask, ans) in dataset {
+        // break;
         seq2seq_model.valid();
         let ask = ask.clone().unsqueeze();
-        let context_vector = seq2seq_model.encoder_forward(ask.clone());
-        let logits = seq2seq_model.decoder_forward(context_vector);
+        let (context_vector, hiddens) = seq2seq_model.encoder_forward(ask.clone());
+        let logits = seq2seq_model.decoder_forward(context_vector, hiddens);
         let pred: Tensor<MyBackend, 1, Int> =
             softmax(logits, 1).argmax(1).permute([1, 0]).squeeze(0);
 
